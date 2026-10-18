@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>草地大作戰：經典打地鼠 🐹</title>
+  <style>
+    :root {
+      --grass-light: #8bc34a;
+      --grass-dark: #558b2f;
+      --dirt-light: #795548;
+      --dirt-dark: #3e2723;
+      --panel-bg: rgba(255, 255, 255, 0.92);
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+      background: linear-gradient(160deg, var(--grass-light) 0%, var(--grass-dark) 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      overflow-x: hidden;
+      transition: background 0.3s ease;
+    }
+
+    /* 狂熱時間背景特效 */
+    body.fever-mode {
+      background: linear-gradient(160deg, #ff9800 0%, #2e7d32 100%);
+    }
+
+    /* 誤擊炸彈震動與紅光特效 */
+    @keyframes shake {
+      0%, 100% { transform: translate(0, 0); }
+      20% { transform: translate(-10px, 6px); }
+      40% { transform: translate(10px, -6px); }
+      60% { transform: translate(-8px, -4px); }
+      80% { transform: translate(8px, 4px); }
+    }
+
+    .shake-effect {
+      animation: shake 0.35s ease-in-out;
+      box-shadow: inset 0 0 80px rgba(255, 0, 0, 0.7);
+    }
+
+    .game-container {
+      width: 100%;
+      max-width: 500px;
+      background: var(--panel-bg);
+      border-radius: 24px;
+      padding: 20px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+      text-align: center;
+      position: relative;
+      border: 4px solid #fff;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    .fever-mode .game-container {
+      border-color: #ffeb3b;
+      box-shadow: 0 0 30px rgba(255, 235, 59, 0.85);
+    }
+
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 1.75rem;
+      color: #2e7d32;
+    }
+
+    .rules-bar {
+      font-size: 0.88rem;
+      color: #555;
+      background: #f1f8e9;
+      padding: 6px 12px;
+      border-radius: 99px;
+      display: inline-block;
+      margin-bottom: 14px;
+      font-weight: 600;
+    }
+
+    /* 儀表板 */
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .stat-box {
+      background: #fff;
+      border: 2px solid #c5e1a5;
+      border-radius: 14px;
+      padding: 8px 4px;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.05);
+    }
+
+    .stat-label {
+      font-size: 0.78rem;
+      color: #666;
+      display: block;
+    }
+
+    .stat-value {
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: #1b5e20;
+    }
+
+    .stat-value.time-warning {
+      color: #d32f2f;
+      animation: pulse 0.5s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.15); }
+    }
+
+    /* 控制列 */
+    .controls {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    select, button {
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 700;
+      padding: 8px 14px;
+      border-radius: 10px;
+      border: 2px solid #689f38;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    select {
+      background: #fff;
+      color: #33691e;
+    }
+
+    .btn-start {
+      background: #ff9800;
+      color: #fff;
+      border-color: #f57c00;
+      box-shadow: 0 4px 0 #e65100;
+    }
+
+    .btn-start:hover:not(:disabled) {
+      background: #fb8c00;
+      transform: translateY(-1px);
+    }
+
+    .btn-start:active:not(:disabled) {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #e65100;
+    }
+
+    .btn-start:disabled {
+      background: #ccc;
+      border-color: #bbb;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    .btn-sound {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    /* 狂熱提示橫幅 */
+    .fever-banner {
+      height: 24px;
+      margin-bottom: 8px;
+      font-weight: 800;
+      color: #d84315;
+      font-size: 0.95rem;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .fever-banner.active {
+      opacity: 1;
+    }
+
+    /* 九宮格地洞區（自訂槌子游標） */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      background: #689f38;
+      padding: 16px;
+      border-radius: 18px;
+      box-shadow: inset 0 4px 12px rgba(0,0,0,0.2);
+      cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><text y="32" font-size="30">🔨</text></svg>') 16 16, pointer;
+    }
+
+    .grid:active {
+      cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><text y="32" font-size="30" transform="rotate(-35 20 20)">🔨</text></svg>') 16 16, pointer;
+    }
+
+    .hole {
+      position: relative;
+      height: 105px;
+      background: radial-gradient(ellipse at center, var(--dirt-dark) 0%, var(--dirt-light) 75%);
+      border-radius: 50% / 35%;
+      box-shadow: inset 0 8px 14px rgba(0, 0, 0, 0.65), 0 4px 0 #33691e;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+    }
+
+    .character {
+      font-size: 3.4rem;
+      line-height: 1;
+      position: absolute;
+      bottom: -80px;
+      transition: bottom 0.14s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      cursor: inherit;
+      filter: drop-shadow(0 4px 4px rgba(0,0,0,0.35));
+    }
+
+    .hole.up .character {
+      bottom: 8px;
+    }
+
+    .character.bonked {
+      transform: scale(0.75) rotate(15deg);
+      opacity: 0.6;
+      transition: transform 0.1s, opacity 0.1s;
+    }
+
+    /* 飄字動畫 */
+    .floating-score {
+      position: absolute;
+      top: 20%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.3rem;
+      font-weight: 900;
+      pointer-events: none;
+      animation: floatUp 0.65s ease-out forwards;
+      z-index: 10;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translate(-50%, 0) scale(0.8); }
+      50% { transform: translate(-50%, -18px) scale(1.1); }
+      100% { opacity: 0; transform: translate(-50%, -34px) scale(1); }
+    }
+
+    .status-msg {
+      margin-top: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #33691e;
+      min-height: 24px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="game-container" id="gameContainer">
+    <h1>🌿 經典可愛打地鼠</h1>
+    <div class="rules-bar">
+      🐹 普通 +10 ｜ 🌟 黃金 +30 ｜ 💣 炸彈 -15
+    </div>
+
+    <div class="dashboard">
+      <div class="stat-box">
+        <span class="stat-label">目前得分</span>
+        <span class="stat-value" id="scoreDisplay">0</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-label">剩餘時間</span>
+        <span class="stat-value" id="timeDisplay">30s</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-label">歷史最高</span>
+        <span class="stat-value" id="highScoreDisplay">0</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <select id="difficultySelect" aria-label="選擇難度">
+        <option value="easy">難度：簡單</option>
+        <option value="normal" selected>難度：普通</option>
+        <option value="hard">難度：困難</option>
+      </select>
+      <button class="btn-start" id="startBtn">開始遊戲</button>
+      <button class="btn-sound" id="soundBtn">🔊 音效：開</button>
+    </div>
+
+    <div class="fever-banner" id="feverBanner">🔥 狂熱時間！最後 10 秒地鼠加速出沒！ 🔥</div>
+
+    <div class="grid" id="grid">
+      <div class="hole"><div class="character">🐹</div></div>
+      <div class="hole"><div class="character">🐹</div></div>
+      <div class="hole"><div class="character">🐹</div></div>
+      <div class="hole"><div class="character">🐹</div></div>
+      <div class="hole"><div class="character">🐹</div></div>
+      <div class="hole"><div class="character">🐹</div></div>
+      <div class="hole"><div class="character">🐹</div></div>
+      <div class="hole"><div class="character">🐹</div></div>
+      <div class="hole"><div class="character">🐹</div></div>
+    </div>
+
+    <div class="status-msg" id="statusMsg">選擇難度後，點擊「開始遊戲」挑戰最高分！</div>
+  </div>
+
+  <script>
+    // 難度參數設定（最小與最大停留毫秒數）
+    const DIFFICULTY_SETTINGS = {
+      easy:   { minTime: 750, maxTime: 1250 },
+      normal: { minTime: 500, maxTime: 950 },
+      hard:   { minTime: 340, maxTime: 680 }
+    };
+
+    const holes = document.querySelectorAll('.hole');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const timeDisplay = document.getElementById('timeDisplay');
+    const highScoreDisplay = document.getElementById('highScoreDisplay');
+    const difficultySelect = document.getElementById('difficultySelect');
+    const startBtn = document.getElementById('startBtn');
+    const soundBtn = document.getElementById('soundBtn');
+    const feverBanner = document.getElementById('feverBanner');
+    const statusMsg = document.getElementById('statusMsg');
+
+    let score = 0;
+    let highScore = Number(localStorage.getItem('whackAMole_highScore')) || 0;
+    let timeLeft = 30;
+    let isPlaying = false;
+    let soundEnabled = true;
+    let lastHole = null;
+    let countdownTimer = null;
+    let peepTimeout = null;
+    let audioCtx = null;
+
+    highScoreDisplay.textContent = highScore;
+
+    // Web Audio API 合成音效（免外部音檔）
+    function playSound(type) {
+      if (!soundEnabled) return;
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      const now = audioCtx.currentTime;
+
+      if (type === 'hit') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(640, now + 0.09);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+        osc.start(now);
+        osc.stop(now + 0.1);
+      } else if (type === 'golden') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523.25, now); // C5
+        osc.frequency.setValueAtTime(783.99, now + 0.07); // G5
+        osc.frequency.setValueAtTime(1046.5, now + 0.14); // C6
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      } else if (type === 'bomb') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.linearRampToValueAtTime(45, now + 0.28);
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+      } else if (type === 'end') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.setValueAtTime(330, now + 0.15);
+        osc.frequency.setValueAtTime(261.6, now + 0.3);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.45);
+        osc.start(now);
+        osc.stop(now + 0.45);
+      }
+    }
+
+    // 音效開關
+    soundBtn.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundBtn.textContent = soundEnabled ? '🔊 音效：開' : '🔇 音效：關';
+    });
+
+    // 取得隨機時間與隨機地洞
+    function randomTime(min, max) {
+      return Math.round(Math.random() * (max - min) + min);
+    }
+
+    function randomHole() {
+      const idx = Math.floor(Math.random() * holes.length);
+      const hole = holes[idx];
+      if (hole === lastHole) return randomHole();
+      lastHole = hole;
+      return hole;
+    }
+
+    // 決定出現的角色類型（70% 普通地鼠、15% 黃金地鼠、15% 炸彈）
+    function getRandomCharacter() {
+      const rand = Math.random();
+      if (rand < 0.70) {
+        return { emoji: '🐹', points: 10, type: 'mole', speedMultiplier: 1 };
+      } else if (rand < 0.85) {
+        return { emoji: '🌟', points: 30, type: 'golden', speedMultiplier: 0.78 };
+      } else {
+        return { emoji: '💣', points: -15, type: 'bomb', speedMultiplier: 1 };
+      }
+    }
+
+    // 讓地鼠探頭
+    function peep() {
+      if (!isPlaying) return;
+
+      const diff = DIFFICULTY_SETTINGS[difficultySelect.value];
+      // 狂熱時間速度加快
+      const feverFactor = timeLeft <= 10 ? 0.72 : 1;
+
+      const charData = getRandomCharacter();
+      const hole = randomHole();
+      const charEl = hole.querySelector('.character');
+
+      charEl.textContent = charData.emoji;
+      charEl.dataset.points = charData.points;
+      charEl.dataset.type = charData.type;
+      charEl.dataset.hit = 'false';
+      charEl.classList.remove('bonked');
+
+      const stayDuration = randomTime(diff.minTime, diff.maxTime) * feverFactor * charData.speedMultiplier;
+      hole.classList.add('up');
+
+      peepTimeout = setTimeout(() => {
+        hole.classList.remove('up');
+        if (isPlaying) peep();
+      }, stayDuration);
+    }
+
+    // 顯示飄字特效
+    function showFloatingText(hole, text, color) {
+      const floatEl = document.createElement('div');
+      floatEl.className = 'floating-score';
+      floatEl.textContent = text;
+      floatEl.style.color = color;
+      hole.appendChild(floatEl);
+      setTimeout(() => floatEl.remove(), 650);
+    }
+
+    // 點擊打擊事件
+    holes.forEach(hole => {
+      const charEl = hole.querySelector('.character');
+
+      charEl.addEventListener('pointerdown', (e) => {
+        if (!isPlaying || !hole.classList.contains('up')) return;
+        if (charEl.dataset.hit === 'true') return; // 防止連點刷分
+
+        charEl.dataset.hit = 'true';
+        charEl.classList.add('bonked');
+
+        const points = Number(charEl.dataset.points);
+        const type = charEl.dataset.type;
+
+        score = Math.max(0, score + points);
+        scoreDisplay.textContent = score;
+
+        if (type === 'mole') {
+          playSound('hit');
+          showFloatingText(hole, '+10', '#fff');
+        } else if (type === 'golden') {
+          playSound('golden');
+          showFloatingText(hole, '+30 🌟', '#ffeb3b');
+        } else if (type === 'bomb') {
+          playSound('bomb');
+          showFloatingText(hole, '-15 💥', '#ff5252');
+          document.body.classList.remove('shake-effect');
+          void document.body.offsetWidth; // 觸發重繪
+          document.body.classList.add('shake-effect');
+        }
+
+        setTimeout(() => {
+          hole.classList.remove('up');
+        }, 120);
+      });
+    });
+
+    // 啟動遊戲
+    function startGame() {
+      if (isPlaying) return;
+
+      score = 0;
+      timeLeft = 30;
+      isPlaying = true;
+
+      scoreDisplay.textContent = score;
+      timeDisplay.textContent = `${timeLeft}s`;
+      timeDisplay.classList.remove('time-warning');
+      feverBanner.classList.remove('active');
+      document.body.classList.remove('fever-mode', 'shake-effect');
+
+      startBtn.disabled = true;
+      difficultySelect.disabled = true;
+      statusMsg.textContent = '遊戲進行中！快拿木槌敲地鼠！';
+
+      peep();
+
+      countdownTimer = setInterval(() => {
+        timeLeft--;
+        timeDisplay.textContent = `${timeLeft}s`;
+
+        // 進入最後 10 秒狂熱時間
+        if (timeLeft === 10) {
+          document.body.classList.add('fever-mode');
+          feverBanner.classList.add('active');
+          timeDisplay.classList.add('time-warning');
+        }
+
+        if (timeLeft <= 0) {
+          endGame();
+        }
+      }, 1000);
+    }
+
+    // 結束遊戲與結算
+    function endGame() {
+      isPlaying = false;
+      clearInterval(countdownTimer);
+      clearTimeout(peepTimeout);
+      holes.forEach(hole => hole.classList.remove('up'));
+
+      document.body.classList.remove('fever-mode');
+      feverBanner.classList.remove('active');
+      timeDisplay.classList.remove('time-warning');
+
+      startBtn.disabled = false;
+      startBtn.textContent = '再玩一次';
+      difficultySelect.disabled = false;
+      playSound('end');
+
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('whackAMole_highScore', highScore);
+        highScoreDisplay.textContent = highScore;
+        statusMsg.textContent = `🎉 遊戲結束！恭喜破紀錄拿下 ${score} 分！`;
+      } else {
+        statusMsg.textContent = `⏰ 時間到！本局獲得 ${score} 分，再挑戰一次吧！`;
+      }
+    }
+
+    startBtn.addEventListener('click', startGame);
+  </script>
+</body>
+</html>
